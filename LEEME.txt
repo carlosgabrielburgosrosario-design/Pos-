@@ -1,0 +1,15 @@
+POS CAFETERÍA & COLMADO — VERSIÓN iPHONE/PWA
+
+Esta versión está preparada para funcionar como una app web instalable en iPhone.
+Incluye:
+- Diseño adaptado a pantalla táctil.
+- Menú horizontal para iPhone.
+- Datos guardados localmente con localStorage.
+- Funcionamiento offline después de la primera carga cuando está publicada con HTTPS.
+- Manifest y Service Worker para instalación como app.
+- Productos iniciales tomados del archivo Excel.
+
+IMPORTANTE:
+Para que Safari permita "Añadir a pantalla de inicio" y la PWA funcione como app, estos archivos deben estar publicados en una dirección HTTPS (por ejemplo, GitHub Pages).
+
+El ZIP NO contiene un enlace público por sí solo; el enlace aparece después de publicar estos archivos en un servicio de hosting.
