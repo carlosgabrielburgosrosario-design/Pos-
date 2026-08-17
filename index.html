@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="POS Colmado">
+<link rel="manifest" href="manifest.webmanifest">
+<title>POS Cafetería & Colmado</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#f3f4f6;color:#111827;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:12px 14px;background:#111827;color:#fff}
+.app{max-width:1100px;margin:auto;min-height:100svh;padding-bottom:20px}
+.top{background:#111827;color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:5}
+.top h1{margin:0;font-size:20px}.top small{opacity:.7}
+nav{display:flex;gap:8px;padding:10px;overflow-x:auto;background:#fff;position:sticky;top:72px;z-index:4;border-bottom:1px solid #ddd;-webkit-overflow-scrolling:touch}
+nav button{flex:0 0 auto;background:#f1f5f9;color:#334155;padding:9px 12px;font-size:12px}nav button.active{background:#111827;color:#fff}
+main{padding:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px #0000000c}.big{font-size:25px;font-weight:800;margin-top:7px}
+.muted{color:#64748b;font-size:13px}.tile{min-height:115px;text-align:left;color:#111827;background:#fff;border:1px solid #e5e7eb}
+.tile strong{display:block;font-size:16px;margin-top:12px}.tile span{font-size:26px}h2{font-size:20px;margin:8px 0 14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1;min-width:120px}
+input,select{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:11px;background:#fff}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden}th,td{text-align:left;padding:11px;border-bottom:1px solid #e5e7eb;font-size:13px}th{background:#f8fafc}
+.primary{background:#2563eb}.danger{background:#dc2626}.success{background:#059669}.warning{background:#d97706}.outline{background:#fff;color:#111827;border:1px solid #d1d5db}
+.total{font-size:30px;font-weight:900}.empty{padding:28px;text-align:center;color:#64748b}
+@media(max-width:600px){main{padding:10px}.grid{grid-template-columns:1fr 1fr}.row>*{min-width:100%;}table{font-size:12px}th,td{padding:9px 7px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><h1>🛒 POS Cafetería & Colmado</h1><small>Ventas · Inventario · Caja · Ganancias</small></header>
+<nav id="nav"></nav><main id="main"></main>
+</div>
+<script>
+const importedProducts=[{"id": "AG001", "name": "Agua", "category": "Bebidas", "unit": "Botella", "cost": 5.0, "price": 15.0, "stock": 0.0, "minStock": 10.0}];
+const savedState=JSON.parse(localStorage.getItem("posState")||"null");
+const state=savedState||{products:[],sales:[],purchases:[],expenses:[],cashStart:0};
+function save(){localStorage.setItem("posState",JSON.stringify(state))}
+if(!Array.isArray(state.closedDays))state.closedDays=[];
+function money(n){return new Intl.NumberFormat("es-DO",{style:"currency",currency:"DOP",maximumFractionDigits:2}).format(Number(n)||0)}
+function today(){return new Date().toISOString().slice(0,10)}
+function page(p){render(p)}
+function navButton(label,p,icon){return `<button onclick="page('${p}')" data-p="${p}">${icon} ${label}</button>`}
+function render(p="home"){
+ const nav=document.getElementById("nav");
+ nav.innerHTML=[navButton("Inicio","home","🏠"),navButton("Venta","sale","🛒"),navButton("Compra","purchase","📦"),navButton("Inventario","inventory","🏪"),navButton("Caja","cash","💵"),navButton("Cuadre","closing","📊"),navButton("Ganancias","profits","💰"),navButton("Gastos","expenses","🧾"),navButton("Productos","products","⚙️")].join("");
+ nav.querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.p===p));
+ const M=document.getElementById("main");
+ if(p==="home")home(M); if(p==="sale")sale(M); if(p==="purchase")purchase(M); if(p==="inventory")inventory(M); if(p==="cash")cash(M); if(p==="closing")closing(M); if(p==="profits")profits(M); if(p==="expenses")expenses(M); if(p==="products")productsPage(M);
+}
+function home(M){const sales=state.sales.filter(x=>x.date===today()).reduce((a,x)=>a+x.total,0),exp=state.expenses.filter(x=>x.date===today()).reduce((a,x)=>a+x.amount,0);
+M.innerHTML=`<h2>Panel principal</h2><div class="grid">
+<button class="tile" onclick="page('sale')"><span>🛒</span><strong>Nueva venta</strong><small>Registrar ventas</small></button>
+<button class="tile" onclick="page('purchase')"><span>📦</span><strong>Registrar compra</strong><small>Aumentar inventario</small></button>
+<button class="tile" onclick="page('inventory')"><span>🏪</span><strong>Inventario</strong><small>Existencias y precios</small></button>
+<button class="tile" onclick="page('cash')"><span>💵</span><strong>Caja</strong><small>Control del efectivo</small></button>
+<button class="tile" onclick="page('closing')"><span>📊</span><strong>Cuadre</strong><small>Efectivo esperado</small></button>
+<button class="tile" onclick="page('profits')"><span>💰</span><strong>Ganancias</strong><small>Utilidad del negocio</small></button>
+<button class="tile" onclick="page('expenses')"><span>🧾</span><strong>Gastos</strong><small>Gastos de caja</small></button>
+<button class="tile" onclick="page('products')"><span>⚙️</span><strong>Productos</strong><small>Crear productos</small></button></div>
+<h2>Resumen de hoy</h2><div class="grid"><div class="card"><div class="muted">Ventas</div><div class="big">${money(sales)}</div></div><div class="card"><div class="muted">Gastos</div><div class="big">${money(exp)}</div></div><div class="card"><div class="muted">Productos</div><div class="big">${state.products.length}</div></div></div>`}
+function productOptions(){return state.products.map(x=>`<option value="${x.id}">${x.name} — ${money(x.price)} — Stock: ${x.stock}</option>`).join("")}
+function sale(M){M.innerHTML=`<h2>🛒 Nueva venta</h2><div class="card"><div class="row"><select id="sp">${productOptions()}</select><input id="sq" type="number" min="1" value="1" placeholder="Cantidad"></div><button class="primary" onclick="addSale()">Agregar</button></div><div id="cart" style="margin-top:12px"></div>`;window.cart=[];drawCart()}
+function addSale(){let id=+sp.value,q=+sq.value,p=state.products.find(x=>x.id===id);if(!p||q<1||q>p.stock)return alert("Cantidad no disponible.");let item=cart.find(x=>x.id===id);if(item)item.qty+=q;else cart.push({id,qty:q});drawCart()}
+function drawCart(){let c=document.getElementById("cart");if(!c)return;if(!cart.length){c.innerHTML='<div class="card empty">No hay productos en la venta.</div>';return}let total=cart.reduce((s,i)=>s+state.products.find(x=>x.id===i.id).price*i.qty,0);c.innerHTML=`<div class="card"><table><tr><th>Producto</th><th>Cant.</th><th>Total</th><th></th></tr>${cart.map(i=>{let p=state.products.find(x=>x.id===i.id);return `<tr><td>${p.name}</td><td>${i.qty}</td><td>${money(p.price*i.qty)}</td><td><button class="danger" onclick="cart=cart.filter(x=>x.id!==${i.id});drawCart()">X</button></td></tr>`}).join("")}</table><p class="total">Total: ${money(total)}</p><button class="success" onclick="finishSale()">💵 Cobrar</button></div>`}
+function finishSale(){if(!cart.length)return;let total=0,cost=0;cart.forEach(i=>{let p=state.products.find(x=>x.id===i.id);p.stock-=i.qty;total+=p.price*i.qty;cost+=p.cost*i.qty});state.sales.push({date:today(),total,cost});save();cart=[];alert("Venta registrada.");page("sale")}
+function purchase(M){M.innerHTML=`<h2>📦 Registrar compra</h2><div class="card"><div class="row"><select id="pp">${productOptions()}</select><input id="pq" type="number" min="1" value="1" placeholder="Cantidad"><input id="pc" type="number" min="0" step=".01" placeholder="Costo total"></div><button class="warning" onclick="finishPurchase()">Registrar compra</button></div>`}
+function finishPurchase(){let p=state.products.find(x=>x.id==+pp.value),q=+pq.value,c=+pc.value;if(!p||q<1||c<0)return alert("Completa los datos.");p.stock+=q;state.purchases.push({date:today(),total:c,qty:q,product:p.name});save();alert("Compra registrada.");page("purchase")}
+function inventory(M){M.innerHTML=`<h2>🏪 Inventario</h2><div class="card"><table><tr><th>Producto</th><th>Stock</th><th>Costo</th><th>Venta</th><th>Ganancia</th><th>Acciones</th></tr>${state.products.map(p=>`<tr><td>${p.name}</td><td>${p.stock}</td><td>${money(p.cost)}</td><td>${money(p.price)}</td><td>${money(p.price-p.cost)}</td><td><button class="danger" onclick="deleteProductFromInventory(${JSON.stringify(p.id)})">🗑️ Eliminar</button></td></tr>`).join("")}</table></div>`}
+function deleteProductFromInventory(id){
+ let p=state.products.find(x=>String(x.id)===String(id));
+ if(!p)return;
+ if(!confirm(`¿Eliminar "${p.name}" del inventario?`))return;
+ state.products=state.products.filter(x=>String(x.id)!==String(id));
+ save();
+ page("inventory");
+}
+function cash(M){let sales=state.sales.reduce((a,x)=>a+x.total,0),p=state.purchases.reduce((a,x)=>a+x.total,0),e=state.expenses.reduce((a,x)=>a+x.amount,0),expected=+state.cashStart+sales-p-e;M.innerHTML=`<h2>💵 Caja</h2><div class="card"><label>Dinero inicial</label><input id="cashStart" type="number" step=".01" value="${state.cashStart}"><button style="margin-top:8px" onclick="state.cashStart=+cashStart.value||0;save();page('cash')">Guardar</button></div><div class="grid" style="margin-top:12px"><div class="card"><div class="muted">Ventas</div><div class="big">${money(sales)}</div></div><div class="card"><div class="muted">Compras</div><div class="big">${money(p)}</div></div><div class="card"><div class="muted">Gastos</div><div class="big">${money(e)}</div></div><div class="card"><div class="muted">Esperado</div><div class="big">${money(expected)}</div></div></div>`}
+function closing(M){
+ let d=today(),
+ s=state.sales.filter(x=>x.date===d).reduce((a,x)=>a+x.total,0),
+ p=state.purchases.filter(x=>x.date===d).reduce((a,x)=>a+x.total,0),
+ e=state.expenses.filter(x=>x.date===d).reduce((a,x)=>a+x.amount,0),
+ ex=+state.cashStart+s-p-e,
+ already=state.closedDays.find(x=>x.date===d);
+ M.innerHTML=`<h2>📊 Cuadre del día</h2>
+ <div class="card">
+ <p>Inicial: <b>${money(state.cashStart)}</b></p>
+ <p>+ Ventas: <b>${money(s)}</b></p>
+ <p>− Compras: <b>${money(p)}</b></p>
+ <p>− Gastos: <b>${money(e)}</b></p>
+ <hr><div class="total">${money(ex)}</div>
+ <div class="muted">Efectivo esperado</div>
+ ${already
+   ? `<p class="success" style="margin-top:12px;padding:10px;border-radius:10px;background:#ecfdf5;color:#065f46">✅ Día terminado. Cierre registrado: ${money(already.expected)}.</p>`
+   : `<button class="danger" style="margin-top:12px" onclick="finishDay()">🔒 Terminar día</button>`}
+ </div>
+ <h2 style="margin-top:18px">📚 Días cerrados</h2>
+ <div class="card">${state.closedDays.length
+   ? `<table><tr><th>Fecha</th><th>Inicial</th><th>Ventas</th><th>Compras</th><th>Gastos</th><th>Cierre</th></tr>${state.closedDays.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${money(x.start)}</td><td>${money(x.sales)}</td><td>${money(x.purchases)}</td><td>${money(x.expenses)}</td><td><b>${money(x.expected)}</b></td></tr>`).join("")}</table>`
+   : `<div class="empty">Todavía no hay días cerrados.</div>`}</div>`;
+}
+function finishDay(){
+ let d=today();
+ if(state.closedDays.some(x=>x.date===d))return alert("El día de hoy ya está cerrado.");
+ let s=state.sales.filter(x=>x.date===d).reduce((a,x)=>a+x.total,0),
+ p=state.purchases.filter(x=>x.date===d).reduce((a,x)=>a+x.total,0),
+ e=state.expenses.filter(x=>x.date===d).reduce((a,x)=>a+x.amount,0),
+ start=+state.cashStart||0,
+ expected=start+s-p-e;
+ if(!confirm(`¿Terminar el día?\\n\\nEfectivo esperado: ${money(expected)}\\n\\nLa caja volverá a 0 para comenzar el próximo día.`))return;
+ state.closedDays.push({date:d,start,sales:s,purchases:p,expenses:e,expected,closedAt:new Date().toISOString()});
+ state.cashStart=0;
+ save();
+ alert("Día terminado y cierre registrado.");
+ page("closing");
+}
+function profits(M){let s=state.sales.reduce((a,x)=>a+x.total,0),c=state.sales.reduce((a,x)=>a+x.cost,0),e=state.expenses.reduce((a,x)=>a+x.amount,0);M.innerHTML=`<h2>💰 Ganancias</h2><div class="grid"><div class="card"><div class="muted">Ventas</div><div class="big">${money(s)}</div></div><div class="card"><div class="muted">Costo vendido</div><div class="big">${money(c)}</div></div><div class="card"><div class="muted">Ganancia bruta</div><div class="big">${money(s-c)}</div></div><div class="card"><div class="muted">Ganancia neta</div><div class="big">${money(s-c-e)}</div></div></div>`}
+function expenses(M){M.innerHTML=`<h2>🧾 Gastos</h2><div class="card"><div class="row"><input id="ed" placeholder="Descripción"><input id="ea" type="number" min="0" step=".01" placeholder="Monto"></div><button class="danger" onclick="addExpense()">Registrar gasto</button></div><div class="card" style="margin-top:12px"><table><tr><th>Fecha</th><th>Descripción</th><th>Monto</th></tr>${state.expenses.map(x=>`<tr><td>${x.date}</td><td>${x.desc}</td><td>${money(x.amount)}</td></tr>`).join("")}</table></div>`}
+function addExpense(){let desc=ed.value.trim(),amount=+ea.value;if(!desc||amount<=0)return alert("Completa los datos.");state.expenses.push({date:today(),desc,amount});save();page("expenses")}
+function productsPage(M){M.innerHTML=`<h2>⚙️ Productos</h2><div class="card"><div class="row"><input id="pn" placeholder="Nombre"><input id="pco" type="number" step=".01" placeholder="Costo"><input id="pr" type="number" step=".01" placeholder="Venta"><input id="ps" type="number" step="1" placeholder="Existencia"></div><button class="primary" onclick="addProduct()">Guardar producto</button></div><div class="card" style="margin-top:12px"><table><tr><th>Producto</th><th>Costo</th><th>Venta</th><th>Stock</th><th>Acciones</th></tr>${state.products.map(p=>`<tr><td>${p.name}</td><td>${money(p.cost)}</td><td>${money(p.price)}</td><td>${p.stock}</td><td><button class="danger" onclick="deleteProduct(${JSON.stringify(p.id)})">🗑️</button></td></tr>`).join("")}</table></div>`}
+function addProduct(){let name=pn.value.trim(),cost=+pco.value,price=+pr.value,stock=+ps.value||0;if(!name||price<0||cost<0)return alert("Completa los datos.");state.products.push({id:Date.now(),name,cost,price,stock});save();page("products")}
+function deleteProduct(id){
+ let p=state.products.find(x=>String(x.id)===String(id));
+ if(!p)return;
+ if(!confirm(`¿Eliminar "${p.name}"?`))return;
+ state.products=state.products.filter(x=>String(x.id)!==String(id));
+ save();
+ productsPage(document.getElementById("main"));
+}
+if("serviceWorker" in navigator && location.protocol!=="file:"){
+ window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+render();
+</script>
+</body></html>
